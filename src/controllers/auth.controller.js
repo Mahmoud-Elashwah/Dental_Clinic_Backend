@@ -122,7 +122,7 @@ exports.logout = catchAsync(async (req, res, next) => {
   });
 });
 
-//resetToken
+//forgetToken
 exports.forgotPassword = catchAsync(async (req, res, next) => {
   // Find user by email
   const user = await User.findOne({ email: req.body.email });
