@@ -1,4 +1,6 @@
 const express = require("express");
+const cookieParser = require("cookie-parser");
+const AppError = require('./utils/AppError');
 require("dotenv").config();
 
 const app = express();
@@ -6,9 +8,27 @@ const app = express();
 // Middleware
 app.use(express.json());
 
-// Example route
-app.get("/", (req, res) => {
-  res.send("API is running");
+// Middleware to parse cookies
+app.use(cookieParser());
+
+// Importing routes 
+const authRoutes = require("./routes/auth.routes");
+const globalErrorHandler = require("./middleware/error.middleware");
+
+
+// Routes
+app.use("/api/v1/auth", authRoutes);
+
+// Handle undefined routes
+app.all('*', (req, res, next) => {
+  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
+ 
+ 
+// Global error handling middleware
+app.use(globalErrorHandler);
+
+
+
 
 module.exports = app;
