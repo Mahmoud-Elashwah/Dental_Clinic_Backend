@@ -18,7 +18,10 @@ const userSchema = new mongoose.Schema(
       unique: [true, "Email already exists"],
       validate: [validator.isEmail, "not valid email or password"],
       lowercase: [true, "Email must be lowercase"],
-      match : [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, "Please fill a valid email address"],
+      match: [
+        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+        "Please fill a valid email address",
+      ],
     },
 
     password: {
@@ -57,13 +60,13 @@ const userSchema = new mongoose.Schema(
       type: Date,
       select: false,
     },
-
   },
   { timestamps: true },
 );
 
 // Create an index on the email field for faster queries
-userSchema.index({ email: 1 });
+//unique:true makes index
+// userSchema.index({ email: 1 });
 
 // Update password change timestamp
 userSchema.pre("save", async function () {
@@ -77,7 +80,7 @@ userSchema.pre("save", async function () {
   this.password = await bcrypt.hash(this.password, 12);
 });
 
-//check if the password is true 
+//check if the password is true
 userSchema.methods.comparePassword = async function (password, userPassword) {
   return await bcrypt.compare(password, userPassword);
 };
