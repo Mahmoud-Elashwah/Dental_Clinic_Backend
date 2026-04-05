@@ -54,18 +54,17 @@ const userSchema = new mongoose.Schema(
     },
 
     passwordChangetAt: {
-      type: Date,
+      type: Date, 
       select: false,
     },
 
   },
   { timestamps: true },
-);
+); 
 
-// Create an index on the email field for faster queries
-userSchema.index({ email: 1 });
 
-// Update password change timestamp
+
+// Update password change timestamp before saving if password is modified
 userSchema.pre("save", async function () {
   if (!this.isModified("password") || this.isNew) return;
   this.passwordChangetAt = Date.now() - 1000;
@@ -77,7 +76,7 @@ userSchema.pre("save", async function () {
   this.password = await bcrypt.hash(this.password, 12);
 });
 
-//check if the password is true 
+// Instance method to compare passwords
 userSchema.methods.comparePassword = async function (password, userPassword) {
   return await bcrypt.compare(password, userPassword);
 };
