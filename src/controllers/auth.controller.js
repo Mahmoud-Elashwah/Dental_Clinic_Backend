@@ -122,7 +122,7 @@ exports.logout = catchAsync(async (req, res, next) => {
   });
 });
 
-//forgetToken
+//forgetPassword
 exports.forgotPassword = catchAsync(async (req, res, next) => {
   // Find user by email
   const user = await User.findOne({ email: req.body.email });
@@ -135,7 +135,7 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   // Create reset URL and email message
   const resetUrl = `${req.protocol}://${req.get(
     "host",
-  )}/api/v1/auth/resetPassword/${resetToken}`;
+  )}/api/v1/auth/reset-password/${resetToken}`;
 
   // Email message to user
   const message = `Forgot your password? Submit a PATCH 
