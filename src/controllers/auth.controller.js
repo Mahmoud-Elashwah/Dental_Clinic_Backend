@@ -1,6 +1,6 @@
 const User = require("../models/Users");
 const catchAsync = require("../utils/CatchAsync");
-const appError = require('../utils/AppError')
+const appError = require("../utils/AppError");
 const sendEmail = require("../utils/email");
 const jwt = require("jsonwebtoken");
 const validator = require("validator");
@@ -180,7 +180,7 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
   const { password } = req.body;
 
   // Check if password is provided
-  if (!password) return next(new appError("please enter password " , 400));
+  if (!password) return next(new appError("please enter password ", 400));
 
   // Update user's password and clear reset token fields
   user.password = req.body.password;
@@ -207,7 +207,7 @@ exports.changePassword = catchAsync(async (req, res, next) => {
   // Update user's password
   user.password = req.body.password;
   await user.save();
-  
+
   sendToken(user, res, 200);
 });
 
@@ -237,7 +237,7 @@ exports.createRefreshToken = catchAsync(async (req, res, next) => {
     },
   );
 
- sendToken(user, res, 200);
+  sendToken(user, res, 200);
 });
 
 exports.getMe = catchAsync(async (req, res, next) => {
