@@ -15,12 +15,16 @@ app.use(cookieParser());
 const authRoutes = require("./routes/auth.routes");
 const userRoutes = require("./routes/user.routes");
 const doctorRoutes = require("./routes/doctor.routes");
+const massageRoutes = require("./routes/message.routes");
+const chatRoutes = require("./routes/chat.routes");
 const globalErrorHandler = require("./middleware/error.middleware");
 
 // Routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/doctors", doctorRoutes);
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/chats", chatRoutes);
+app.use("/api/v1/messages", massageRoutes);
 
 // Handle undefined routes
 app.all("*", (req, res, next) => {
