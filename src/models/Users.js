@@ -18,7 +18,10 @@ const userSchema = new mongoose.Schema(
       unique: [true, "Email already exists"],
       validate: [validator.isEmail, "not valid email or password"],
       lowercase: [true, "Email must be lowercase"],
-      match : [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, "Please fill a valid email address"],
+      match: [
+        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+        "Please fill a valid email address",
+      ],
     },
 
     password: {
@@ -54,15 +57,12 @@ const userSchema = new mongoose.Schema(
     },
 
     passwordChangetAt: {
-      type: Date, 
+      type: Date,
       select: false,
     },
-
   },
   { timestamps: true },
-); 
-
-
+);
 
 // Update password change timestamp before saving if password is modified
 userSchema.pre("save", async function () {
