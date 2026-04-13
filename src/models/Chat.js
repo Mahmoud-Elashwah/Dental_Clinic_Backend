@@ -35,6 +35,14 @@ const chatSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    adminId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    lastMessageSenderRole: { type: String, enum: ["patient", "admin"] },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );

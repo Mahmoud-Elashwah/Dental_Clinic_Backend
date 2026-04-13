@@ -10,6 +10,7 @@ router.use(authController.protect);
 router.get("/", chatController.getChats);
 router.get("/:id", chatController.getChat);
 router.post("/", chatController.createChat);
+router.patch("/:chatId/markAsRead", chatController.markChatAsRead);
 
 // Messages
 

@@ -38,14 +38,17 @@ const messageSchema = new mongoose.Schema(
 
 messageSchema.index({ chatId: 1, createdAt: -1 });
 
-// 🔥 Post-save hook
+
 messageSchema.post("save", async function (doc) {
-  const isPatient = doc.senderRole === "patient";
+  const isPatientSender = doc.senderRole === "patient";
 
   await Chat.findByIdAndUpdate(doc.chatId, {
-    lastMessage: doc.content.slice(0, 60),
+    lastMessage: doc.content.slice(0, 60) + (doc.content.length > 60 ? "..." : ""),
     lastMessageAt: doc.createdAt,
-    $inc: isPatient ? { unreadByAdmin: 1 } : { unreadByPatient: 1 },
+    lastMessageSenderRole: doc.senderRole,
+    $inc: isPatientSender 
+      ? { unreadByAdmin: 1 } 
+      : { unreadByPatient: 1 },
   });
 });
 

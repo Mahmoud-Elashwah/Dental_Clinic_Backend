@@ -5,12 +5,38 @@ const Message = require("../models/Message");
 exports.sendMessage = catchAsync(async (req, res, next) => {
   const { chatId, content } = req.body;
 
+  // Validation + Business logic
+  if (!chatId || !content?.trim()) {
+    return next(new appError("Chat ID and content are required", 400));
+  }
+
+  // verify chat existence and access rights
+  if (req.user.role !== "admin" && req.user.role !== "patient") {
+    return next(new appError("Not allowed", 403));
+  }
+
   const message = await Message.create({
     chatId,
     senderId: req.user.id,
     senderRole: req.user.role,
-    content,
+    content: content.trim(),
   });
+
+  // Populate sender details for response
+  const populatedMessage = await Message.findById(message._id).populate(
+    "senderId",
+    "name role",
+  );
+
+  // Emit real-time updates to the chat room
+  const io = req.app.get("io");
+  if (io) {
+    io.to(chatId).emit("newMessage", populatedMessage);
+    io.to(chatId).emit("chatUpdated", {
+      chatId,
+      lastMessage: populatedMessage,
+    });
+  }
 
   res.status(201).json({
     status: "success",
@@ -33,30 +59,5 @@ exports.getMessages = catchAsync(async (req, res, next) => {
     status: "success",
     results: messages.length,
     data: messages,
-  });
-});
-
-// mark message as read
-exports.markMessageAsRead = catchAsync(async (req, res, next) => {
-  const message = await Message.findById(req.params.id);
-
-  if (!message) {
-    return next(new AppError("Message not found", 404));
-  }
-
-  if (!message.isRead) {
-    message.isRead = true;
-    await message.save();
-
-    const isPatient = message.senderRole === "patient";
-
-    await Chat.findByIdAndUpdate(message.chatId, {
-      $inc: isPatient ? { unreadByAdmin: -1 } : { unreadByPatient: -1 },
-    });
-  }
-
-  res.status(200).json({
-    status: "success",
-    message: "Message marked as read",
   });
 });
