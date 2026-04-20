@@ -12,15 +12,34 @@ const {
 router.use(authController.protect);
 
 router.get(
-  "/me",
+  "/available",
   authController.restrict("patient"),
-  appointmentController.getMyAppointments,
+  appointmentController.getAvailableSlots,
 );
+
+router.get(
+  "/today",
+  authController.restrict("admin"),
+  appointmentController.getTodayAppointments,
+);
+
+router.get(
+  "/patient/:patientId",
+  authController.restrict("admin", "patient"),
+  appointmentController.getPatientAppointments,
+);
+
+router.get(
+  "/doctor/:doctorId",
+  authController.restrict("admin"),
+  appointmentController.getDoctorAppointments,
+);
+
 
 router
   .route("/")
   .get(
-    authController.restrict("admin"),
+    authController.restrict("admin", "patient"),
     appointmentController.getAllAppointments,
   )
   .post(
@@ -29,12 +48,7 @@ router
     appointmentController.createAppointment,
   );
 
-router.patch(
-  "/:id/cancel",
-  authController.restrict("admin", "patient"),
-  validate(cancelAppointmentValidation),
-  appointmentController.cancelAppointment,
-);
+
 
 router
   .route("/:id")
@@ -42,14 +56,15 @@ router
     authController.restrict("admin", "patient"),
     appointmentController.getAppointmentById,
   )
-  .patch(
+  .put(
     authController.restrict("admin", "patient"),
     validate(updateAppointmentValidation),
     appointmentController.updateAppointment,
   )
   .delete(
-    authController.restrict("admin"),
-    appointmentController.deleteAppointment,
+    authController.restrict("admin", "patient"),
+    validate(cancelAppointmentValidation),
+    appointmentController.cancelAppointment,
   );
 
 module.exports = router;

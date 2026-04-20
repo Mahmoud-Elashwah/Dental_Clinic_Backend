@@ -33,19 +33,24 @@ const assertNoConflict = async (payload, excludeId) => {
   }
 };
 
-// @desc    List appointments (admin)
+// @desc    List appointments (admin sees all, patient sees own)
 // @route   GET /api/v1/appointments
-// @access  Admin
+// @access  Admin, Patient
 
 exports.getAllAppointments = catchAsync(async (req, res, next) => {
-  const baseQuery = Appointment.find();
+  const filter = {};
+  if (req.user.role === "patient") {
+    filter.patientId = req.user.id;
+  }
+
+  const baseQuery = Appointment.find(filter);
   const features = new APIFeatures(baseQuery, req.query)
     .filter()
     .sort()
     .fields()
     .paginate();
 
-  if (!req.query.fields) {
+  if (req.user.role === "admin" && !req.query.fields) {
     features.query.select("+adminNotes");
   }
 
@@ -59,6 +64,7 @@ exports.getAllAppointments = catchAsync(async (req, res, next) => {
     data: { appointments },
   });
 });
+
 
 // @desc    Current patient's appointments
 // @route   GET /api/v1/appointments/me
@@ -230,6 +236,135 @@ exports.updateAppointment = catchAsync(async (req, res, next) => {
     data: { appointment: out },
   });
 });
+
+// @desc    Get available slots across all doctors
+// @route   GET /api/v1/appointments/available
+// @access  Patient
+
+exports.getAvailableSlots = catchAsync(async (req, res, next) => {
+  const { date } = req.query;
+  if (!date) {
+    return next(new AppError("Please provide a date query parameter (YYYY-MM-DD)", 400));
+  }
+
+  const targetDate = new Date(date);
+  const dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+  const dayKey = dayNames[targetDate.getDay()];
+
+  const doctors = await Doctor.find({ isActive: true });
+  const appointments = await Appointment.find({
+    date: {
+      $gte: new Date(targetDate.setHours(0, 0, 0, 0)),
+      $lte: new Date(targetDate.setHours(23, 59, 59, 999)),
+    },
+    status: { $in: ACTIVE_BOOKING_STATUSES },
+  });
+
+  const availableSlots = doctors.map((doc) => {
+    const schedule = doc.workingHours[dayKey];
+    if (!schedule || schedule.isOff) return { doctorId: doc._id, doctorName: doc.name, slots: [] };
+
+    const slots = [];
+    let current = new Date(date);
+    const [startH, startM] = schedule.start.split(":").map(Number);
+    const [endH, endM] = schedule.end.split(":").map(Number);
+
+    current.setHours(startH, startM, 0, 0);
+    const endTime = new Date(date);
+    endTime.setHours(endH, endM, 0, 0);
+
+    while (current < endTime) {
+      const nextSlot = new Date(current.getTime() + doc.slotDuration * 60000);
+      if (nextSlot > endTime) break;
+
+      const isTaken = appointments.some(
+        (apt) =>
+          apt.doctorId.toString() === doc._id.toString() &&
+          apt.date.getTime() < nextSlot.getTime() &&
+          slotEnd(apt.date, apt.duration).getTime() > current.getTime()
+      );
+
+      if (!isTaken) {
+        slots.push(new Date(current));
+      }
+      current = nextSlot;
+    }
+
+    return {
+      doctorId: doc._id,
+      doctorName: doc.name,
+      specialization: doc.specialization,
+      slots,
+    };
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: { availableSlots },
+  });
+});
+
+// @desc    Today's full appointment schedule
+// @route   GET /api/v1/appointments/today
+// @access  Admin
+
+exports.getTodayAppointments = catchAsync(async (req, res, next) => {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+
+  const appointments = await Appointment.find({
+    date: { $gte: start, $lte: end },
+  })
+    .populate({ path: "patientId", select: "name email phone" })
+    .populate({ path: "doctorId", select: "name email specialization" });
+
+  res.status(200).json({
+    status: "success",
+    results: appointments.length,
+    data: { appointments },
+  });
+});
+
+// @desc    All appointments for a patient
+// @route   GET /api/v1/appointments/patient/:patientId
+// @access  Patient (own), Admin
+
+exports.getPatientAppointments = catchAsync(async (req, res, next) => {
+  const { patientId } = req.params;
+
+  if (req.user.role === "patient" && req.user.id !== patientId) {
+    return next(new AppError("You can only access your own appointments", 403));
+  }
+
+  const appointments = await Appointment.find({ patientId })
+    .populate({ path: "doctorId", select: "name email specialization" });
+
+  res.status(200).json({
+    status: "success",
+    results: appointments.length,
+    data: { appointments },
+  });
+});
+
+// @desc    All appointments for a doctor
+// @route   GET /api/v1/appointments/doctor/:doctorId
+// @access  Admin
+
+exports.getDoctorAppointments = catchAsync(async (req, res, next) => {
+  const { doctorId } = req.params;
+
+  const appointments = await Appointment.find({ doctorId })
+    .populate({ path: "patientId", select: "name email phone" });
+
+  res.status(200).json({
+    status: "success",
+    results: appointments.length,
+    data: { appointments },
+  });
+});
+
 
 // @desc    Cancel appointment
 // @route   PATCH /api/v1/appointments/:id/cancel
