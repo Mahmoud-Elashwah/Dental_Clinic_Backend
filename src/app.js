@@ -17,6 +17,7 @@ const userRoutes = require("./routes/user.routes");
 const doctorRoutes = require("./routes/doctor.routes");
 const massageRoutes = require("./routes/message.routes");
 const chatRoutes = require("./routes/chat.routes");
+const appointmentRoutes = require("./routes/appointment.routes");
 const globalErrorHandler = require("./middleware/error.middleware");
 
 // Routes
@@ -25,6 +26,7 @@ app.use("/api/v1/doctors", doctorRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/chats", chatRoutes);
 app.use("/api/v1/messages", massageRoutes);
+app.use("/api/v1/appointments", appointmentRoutes);
 
 // Handle undefined routes
 app.all("*", (req, res, next) => {
