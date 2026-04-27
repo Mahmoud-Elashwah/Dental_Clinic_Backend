@@ -84,7 +84,6 @@ appointmentSchema.pre("save", function (next) {
   if (this.isModified("status") && this.status === "cancelled" && !this.cancelledAt) {
     this.cancelledAt = new Date();
   }
-  next();
 });
 
 appointmentSchema.statics.STATUSES = STATUSES;
