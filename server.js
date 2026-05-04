@@ -14,13 +14,13 @@ const server = http.createServer(app);
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "*",                    // ← غيّره لاحقاً إلى رابط الـ frontend
+    origin: "*",                    
     methods: ["GET", "POST"],
     credentials: true,
   },
   pingTimeout: 60000,
-  pingInterval: 25000,
-});  
+  pingInterval: 25000, 
+});   
 
 // Initialize Socket handlers
 initializeSocket(io);
