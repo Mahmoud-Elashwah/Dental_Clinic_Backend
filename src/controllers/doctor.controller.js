@@ -55,15 +55,35 @@ const minutesToTime = (mins) => {
 //   });
 // });
 
+const Review = require("../models/Review");
+
 exports.getAllDoctors = catchAsync(async (req, res, next) => {
   const doctors = await User.find({
     role: "doctor"
-  }).select("-password");
+  }).select("-password").lean();
+
+  // Fetch average rating for each doctor
+  const doctorsWithRatings = await Promise.all(
+    doctors.map(async (doc) => {
+      const reviews = await Review.find({ doctorId: doc._id });
+      const totalReviews = reviews.length;
+      const averageRating =
+        totalReviews > 0
+          ? (reviews.reduce((acc, curr) => acc + curr.rating, 0) / totalReviews).toFixed(1)
+          : 0;
+          
+      return {
+        ...doc,
+        averageRating: parseFloat(averageRating),
+        reviewCount: totalReviews
+      };
+    })
+  );
 
   res.status(200).json({
     status: "success",
-    results: doctors.length,
-    data: { doctors },
+    results: doctorsWithRatings.length,
+    data: { doctors: doctorsWithRatings },
   });
 });
 

@@ -48,7 +48,7 @@ exports.googleCallback = async (req, res) => {
 
     // 🔐 TOKENS
     const payload = {
-      _id: user._id,
+      id: user._id,
     };
 
     const access_token = jwt.sign(payload, process.env.JWT_SECRET, {
@@ -74,8 +74,9 @@ exports.googleCallback = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
+    const intendedRole = req.query.state || 'patient';
     // Redirect to frontend with token
-    return res.redirect(`http://localhost:5173/oauth-success?token=${access_token}`);
+    return res.redirect(`http://localhost:5173/oauth-success?token=${access_token}&intendedRole=${intendedRole}`);
 
   } catch (err) {
     res.status(500).json({ message: err.message });

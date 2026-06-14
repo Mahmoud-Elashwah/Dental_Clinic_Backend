@@ -5,9 +5,13 @@ const oauthController = require('../controllers/oauth.controller');
 
 router.get(
   '/google',
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-  })
+  (req, res, next) => {
+    passport.authenticate('google', {
+      scope: ['profile', 'email'],
+      state: req.query.role || 'patient',
+      prompt: 'select_account'
+    })(req, res, next);
+  }
 );
 
 router.get(
