@@ -45,7 +45,7 @@ app.use("/api/v1/chats", chatRoutes);
 app.use("/api/v1/messages", massageRoutes);
 app.use("/api/v1/appointments", appointmentRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
-app.use("/api/v1/chat", chatbotRoutes);
+app.use("/api/v1/chatbot", chatbotRoutes);
 
 // Handle undefined routes
 app.all("*", (req, res, next) => {
