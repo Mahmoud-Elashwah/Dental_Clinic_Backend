@@ -15,23 +15,33 @@ const buildDoctorPayload = (doctor, averageRating, reviewCount) => ({
   reviewCount,
 });
 
-exports.findDoctors = async ({ specialization } = {}) => {
+exports.findDoctors = async ({ specialization, name } = {}) => {
   const filter = { role: "doctor" };
   if (specialization) filter.specialization = specialization;
-
+  if (name) filter.name = { $regex: name.split(" ").join("|"), $options: "i" };
+  console.log("findDoctors filter:", JSON.stringify(filter));
   const doctors = await User.find(filter).select("-password").lean();
+  console.log("doctors found:", doctors.length); // ← وده
+  const doctorIds = doctors.map((d) => d._id);
 
-  return Promise.all(
-    doctors.map(async (doctor) => {
-      const reviews = await Review.find({ doctorId: doctor._id }).lean();
-      const reviewCount = reviews.length;
-      const averageRating =
-        reviewCount > 0
-          ? Number((reviews.reduce((sum, item) => sum + item.rating, 0) / reviewCount).toFixed(1))
-          : 0;
-      return buildDoctorPayload(doctor, averageRating, reviewCount);
-    }),
-  );
+  // جيب كل الـ reviews في query وحدة
+  const allReviews = await Review.find({ doctorId: { $in: doctorIds } }).lean();
+
+  return doctors.map((doctor) => {
+    const reviews = allReviews.filter(
+      (r) => r.doctorId.toString() === doctor._id.toString(),
+    );
+    const reviewCount = reviews.length;
+    const averageRating =
+      reviewCount > 0
+        ? Number(
+            (
+              reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+            ).toFixed(1),
+          )
+        : 0;
+    return buildDoctorPayload(doctor, averageRating, reviewCount);
+  });
 };
 
 exports.getDoctorById = async (doctorId) => {
@@ -39,7 +49,9 @@ exports.getDoctorById = async (doctorId) => {
     throw new AppError("Invalid doctor id", 400);
   }
 
-  const doctor = await User.findOne({ _id: doctorId, role: "doctor" }).select("-password").lean();
+  const doctor = await User.findOne({ _id: doctorId, role: "doctor" })
+    .select("-password")
+    .lean();
   if (!doctor) {
     throw new AppError("Doctor not found", 404);
   }
@@ -48,7 +60,11 @@ exports.getDoctorById = async (doctorId) => {
   const reviewCount = reviews.length;
   const averageRating =
     reviewCount > 0
-      ? Number((reviews.reduce((sum, item) => sum + item.rating, 0) / reviewCount).toFixed(1))
+      ? Number(
+          (
+            reviews.reduce((sum, item) => sum + item.rating, 0) / reviewCount
+          ).toFixed(1),
+        )
       : 0;
 
   return buildDoctorPayload(doctor, averageRating, reviewCount);

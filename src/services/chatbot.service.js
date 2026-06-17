@@ -1,22 +1,27 @@
-const AppError = require("../utils/AppError");
 const ollamaService = require("./ollama.service");
 const bookingService = require("./booking.service");
 const doctorsService = require("./doctors.service");
 const conversationMemory = require("./conversationMemory.service");
+const mongoose = require("mongoose");
 
 const detectLanguage = (text) => {
-  if (/[\u0600-\u06FF]/.test(text)) return "ar";
-  return "en";
+  return /[\u0600-\u06FF]/.test(text) ? "ar" : "en";
 };
 
-const buildJsonResponse = ({ intent, message, data = {} }) => ({
+const buildResponse = ({ intent, message, data = {} }) => ({
   intent,
   message,
   data,
 });
 
-const mediaFriendlyMessage = (text, fallback) => {
-  return String(text || fallback || "").trim();
+const safeMessage = (text, fallback) => {
+  return (text || fallback || "").trim();
+};
+
+const normalizeTime = (t) => {
+  if (!t) return null;
+  const [h, m] = t.split(":").map(Number);
+  return `${h}:${String(m).padStart(2, "0")}`;
 };
 
 exports.handleUserMessage = async (message, { sessionKey, user }) => {
@@ -24,136 +29,242 @@ exports.handleUserMessage = async (message, { sessionKey, user }) => {
   conversationMemory.addMessage(sessionKey, "user", message);
 
   const aiIntent = await ollamaService.classifyIntent(message, memory);
-  const intent = aiIntent.intent || "UNKNOWN";
-  const userLanguage = detectLanguage(message);
+  const intent = aiIntent?.intent || "UNKNOWN";
+
   let response;
 
   switch (intent) {
     case "GREETING": {
-      const messageText = mediaFriendlyMessage(
-        aiIntent.message,
-        userLanguage === "ar"
-          ? "أهلاً! كيف أقدر أساعدك النهارده؟"
-          : "Hi! How can I help you today?",
-      );
-      response = buildJsonResponse({ intent, message: messageText, data: {} });
+      response = buildResponse({
+        intent,
+        message: safeMessage(
+          aiIntent.message,
+          "Hello! How can I assist you today?",
+        ),
+      });
       break;
     }
 
     case "GET_DOCTORS": {
       const specialization = aiIntent.data?.specialization || null;
       const doctors = await doctorsService.findDoctors({ specialization });
-      const messageText = doctors.length
-        ? `I found ${doctors.length} doctor${doctors.length > 1 ? "s" : ""} for you.`
-        : "I could not find matching doctors right now. Please try a different specialty.";
-      response = buildJsonResponse({
+
+      response = buildResponse({
         intent,
-        message: messageText,
+        message: doctors.length
+          ? `Found ${doctors.length} doctor${doctors.length > 1 ? "s" : ""}.`
+          : "No doctors found for this specialization.",
         data: { doctors, specialization },
       });
       break;
     }
 
     case "GET_AVAILABLE_SLOTS": {
-      const date = aiIntent.data?.date;
-      const doctorId = aiIntent.data?.doctorId;
+      const dateMatch = message.match(/\d{4}-\d{2}-\d{2}/);
+      const date = aiIntent.data?.date || (dateMatch ? dateMatch[0] : null);
+      let { doctorId } = aiIntent.data || {};
+      const doctorName = aiIntent.data?.doctorName || null;
+
+      console.log("aiIntent.data:", JSON.stringify(aiIntent.data)); // ← ضيف
+      console.log("doctorName:", doctorName, "doctorId:", doctorId); // ← ضيف
+
+      if (!doctorId && doctorName) {
+        const doctors = await doctorsService.findDoctors({ name: doctorName });
+        console.log("doctors found:", doctors.length); // ← ضيف
+        if (doctors.length) doctorId = doctors[0].id || doctors[0]._id;
+        console.log("doctorId after lookup:", doctorId); // ← ضيف
+      }
 
       if (!date) {
-        response = buildJsonResponse({
+        response = buildResponse({
           intent,
-          message: "Please provide a date in the format YYYY-MM-DD to check available slots.",
-          data: {},
+          message: "Please provide a date (YYYY-MM-DD).",
         });
         break;
       }
 
-      const availableSlots = await bookingService.getAvailableSlots({ date, doctorId });
-      const messageText = availableSlots.length
-        ? `Here are the available slots for ${date}.`
-        : `No available slots found for ${date}. Try another date or doctor.`;
+      const slots = await bookingService.getAvailableSlots({ date, doctorId });
 
-      response = buildJsonResponse({
+      response = buildResponse({
         intent,
-        message: messageText,
-        data: { date, doctorId: doctorId || null, availableSlots },
+        message: slots.length
+          ? `Available slots for ${date}.`
+          : `No slots available for ${date}.`,
+        data: { date, doctorId: doctorId || null, slots },
       });
       break;
     }
 
     case "BOOK_APPOINTMENT": {
-      const doctorId = aiIntent.data?.doctorId || null;
-      const date = aiIntent.data?.date || null;
-      const note = aiIntent.data?.notes || null;
-      const duration = aiIntent.data?.duration || null;
-      const doctor = doctorId ? await doctorsService.getDoctorById(doctorId) : null;
-      const availableSlots = date ? await bookingService.getAvailableSlots({ date, doctorId: doctorId || undefined }) : [];
+      const { date, notes, duration, time } = aiIntent.data || {};
+      let { doctorId } = aiIntent.data || {};
+      const doctorName = aiIntent.data?.doctorName || null;
 
-      const messageText = doctor
-        ? `I found Dr. ${doctor.name}. Tell me the slot you want to book or send the booking details.`
-        : "I can help you book an appointment. Please share the doctor and date you prefer.";
+      if (!doctorId && doctorName) {
+        const doctors = await doctorsService.findDoctors({ name: doctorName });
+        if (doctors.length) doctorId = doctors[0].id || doctors[0]._id;
+      }
 
-      response = buildJsonResponse({
+      if (!doctorId || !date) {
+        response = buildResponse({
+          intent,
+          message: !doctorId
+            ? "Doctor not found, please try again."
+            : "Please provide a date.",
+        });
+        break;
+      }
+
+      if (!user) {
+        response = buildResponse({
+          intent,
+          message: "You must be logged in to book an appointment.",
+        });
+        break;
+      }
+
+      if (!time) {
+        response = buildResponse({
+          intent,
+          message: "Please provide a time for the appointment.",
+        });
+        break;
+      }
+
+      const existingSlots = await bookingService.getAvailableSlots({
+        date,
+        doctorId,
+      });
+      const normalizedTime = normalizeTime(time);
+      const isSlotTaken = !existingSlots.some(
+        (slot) => slot.hour === normalizedTime,
+      );
+
+      if (isSlotTaken) {
+        response = buildResponse({
+          intent,
+          message: `Slot ${time} is already booked for doctor ${doctorName}. Please choose another time.`,
+          data: { date, doctorId },
+        });
+        break;
+      }
+
+      const appointment = await bookingService.createAppointment({
+        doctorId,
+        patientId: user.id,
+        date,
+        time,
+        notes,
+        duration,
+      });
+
+      const doctor = await doctorsService.getDoctorById(doctorId);
+
+      response = buildResponse({
         intent,
-        message: mediaFriendlyMessage(aiIntent.message, messageText),
+        message: `Appointment booked on ${date} at ${time}.`,
         data: {
-          doctor: doctor
-            ? {
-                id: doctor._id,
-                name: doctor.name,
-                specialization: doctor.specialization,
-              }
-            : null,
+          appointmentId: appointment._id,
           date,
-          duration,
-          note,
-          suggestedSlots: availableSlots,
+          doctorId,
+          doctorName: doctor.name,
         },
       });
       break;
     }
 
     case "CANCEL_APPOINTMENT": {
-      const appointmentId = aiIntent.data?.appointmentId || null;
-
-      if (!appointmentId) {
-        response = buildJsonResponse({
+      const rawAppointmentId = aiIntent.data?.appointmentId || null;
+      // تأكد إن الـ appointmentId MongoDB ObjectId صح
+      const appointmentId = mongoose.Types.ObjectId.isValid(rawAppointmentId)
+        ? rawAppointmentId
+        : null;
+      console.log("appointmentId from ollama:", appointmentId);
+      if (!user) {
+        response = buildResponse({
           intent,
-          message: "Please provide the appointment ID you want to cancel.",
-          data: {},
+          message: "You must be logged in to cancel an appointment.",
         });
         break;
       }
 
-      try {
-        const appointment = await bookingService.getAppointmentById(appointmentId);
-        const isOwner = user && appointment.patientId.toString() === user.id;
-        const isAdmin = user && user.role === "admin";
+      let resolvedAppointmentId = appointmentId;
 
-        if (!isOwner && !isAdmin) {
-          response = buildJsonResponse({
+      // لو مفيش appointmentId، ابحث بالـ doctor + date
+      if (!resolvedAppointmentId) {
+        const date = aiIntent.data?.date || null;
+        let { doctorId } = aiIntent.data || {};
+        const doctorName = aiIntent.data?.doctorName || null;
+
+        if (!doctorId && doctorName) {
+          const doctors = await doctorsService.findDoctors({
+            name: doctorName,
+          });
+          if (doctors.length) doctorId = doctors[0].id || doctors[0]._id;
+        }
+
+        if (!date || !doctorId) {
+          response = buildResponse({
             intent,
-            message: "I found the appointment, but I can only help cancel appointments for your account.",
-            data: { appointmentId },
+            message: "Please provide appointment ID or doctor name and date.",
           });
           break;
         }
 
-        response = buildJsonResponse({
+        const found = await bookingService.findAppointment({
+          patientId: user.id,
+          doctorId,
+          date,
+        });
+        console.log("found appointment:", found);
+
+        if (!found) {
+          response = buildResponse({
+            intent,
+            message: "No appointment found for this doctor and date.",
+          });
+          break;
+        }
+
+        resolvedAppointmentId = found._id;
+      }
+
+      try {
+        const appointment = await bookingService.getAppointmentById(
+          resolvedAppointmentId,
+        );
+        const isOwner = appointment.patientId._id
+          ? appointment.patientId._id.toString() === user.id
+          : appointment.patientId.toString() === user.id;
+        const isAdmin = user.role === "admin";
+
+        if (!isOwner && !isAdmin) {
+          response = buildResponse({
+            intent,
+            message: "You can only cancel your own appointments.",
+            data: { appointmentId: resolvedAppointmentId },
+          });
+          break;
+        }
+
+        await bookingService.cancelAppointment(resolvedAppointmentId);
+
+        response = buildResponse({
           intent,
-          message: `I found your appointment on ${appointment.date.toISOString().slice(0, 10)}. To cancel it, send a cancellation request to /api/v1/appointments/${appointment._id}/cancel`,
+          message: `Appointment on ${appointment.date.toISOString().slice(0, 10)} at ${appointment.date.toISOString().slice(11, 16)} has been cancelled.`,
           data: {
             appointmentId: appointment._id,
-            status: appointment.status,
+            status: "cancelled",
             doctor: appointment.doctorId?.name || null,
             date: appointment.date,
           },
         });
       } catch (err) {
         if (err.statusCode === 404) {
-          response = buildJsonResponse({
+          response = buildResponse({
             intent,
-            message: "I could not find that appointment. Please check the ID and try again.",
-            data: { appointmentId },
+            message: "Appointment not found.",
+            data: { appointmentId: resolvedAppointmentId },
           });
         } else {
           throw err;
@@ -163,22 +274,23 @@ exports.handleUserMessage = async (message, { sessionKey, user }) => {
     }
 
     case "FAQ": {
-      response = buildJsonResponse({
+      response = buildResponse({
         intent,
-        message: mediaFriendlyMessage(aiIntent.message, "I can help with dental clinic questions. Ask me about appointments or doctors."),
-        data: {},
+        message: safeMessage(
+          aiIntent.message,
+          "I can help with doctors and appointments.",
+        ),
       });
       break;
     }
 
     default: {
-      response = buildJsonResponse({
+      response = buildResponse({
         intent: "UNKNOWN",
-        message: mediaFriendlyMessage(
+        message: safeMessage(
           aiIntent.message,
-          "I’m not sure I understood. Can you please rephrase your question?",
+          "I didn't understand. Please rephrase.",
         ),
-        data: {},
       });
     }
   }

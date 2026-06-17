@@ -3,37 +3,51 @@ const Appointment = require("../models/Appointment");
 const AppError = require("../utils/AppError");
 
 exports.getAvailableSlots = async ({ date, doctorId } = {}) => {
-  if (!date) {
-    throw new AppError("Date is required to find available slots", 400);
-  }
+  if (!date) throw new AppError("Date is required", 400);
 
   const targetDate = new Date(date);
-  if (Number.isNaN(targetDate.getTime())) {
+  if (Number.isNaN(targetDate.getTime()))
     throw new AppError("Invalid date format. Use YYYY-MM-DD.", 400);
-  }
 
   const startOfDay = new Date(targetDate);
-  startOfDay.setHours(0, 0, 0, 0);
+  startOfDay.setUTCHours(0, 0, 0, 0);
   const endOfDay = new Date(targetDate);
-  endOfDay.setHours(23, 59, 59, 999);
+  endOfDay.setUTCHours(23, 59, 59, 999);
 
   const filter = {
     date: { $gte: startOfDay, $lte: endOfDay },
     status: { $in: ["pending", "confirmed"] },
   };
-  if (doctorId) filter.doctorId = doctorId;
+  if (doctorId)
+    filter.doctorId = new mongoose.Types.ObjectId(doctorId.toString());
 
-  const appointments = await Appointment.find(filter)
-    .populate({ path: "doctorId", select: "name" })
-    .lean();
+  const booked = await Appointment.find(filter).lean();
+  console.log(
+    "booked appointments:",
+    booked.length,
+    JSON.stringify(
+      booked.map((a) => ({
+        id: a._id,
+        date: a.date,
+        status: a.status,
+        doctorId: a.doctorId,
+      })),
+    ),
+  );
+  const bookedTimes = new Set(
+    booked.map((apt) => new Date(apt.date).getUTCHours()),
+  );
 
-  return appointments.map((apt) => ({
-    appointmentId: apt._id,
-    doctorName: apt.doctorId?.name || null,
-    date: apt.date,
-    duration: apt.duration,
-    status: apt.status,
-  }));
+  const allSlots = Array.from({ length: 9 }, (_, i) => i + 9);
+  const freeSlots = allSlots
+    .filter((hour) => !bookedTimes.has(hour))
+    .map((hour) => {
+      const slotDate = new Date(targetDate);
+      slotDate.setUTCHours(hour, 0, 0, 0);
+      return { time: slotDate, hour: `${hour}:00` };
+    });
+
+  return freeSlots;
 };
 
 exports.getAppointmentById = async (appointmentId) => {
@@ -45,9 +59,78 @@ exports.getAppointmentById = async (appointmentId) => {
     .populate({ path: "doctorId", select: "name" })
     .populate({ path: "patientId", select: "name" });
 
-  if (!appointment) {
-    throw new AppError("Appointment not found", 404);
+  if (!appointment) throw new AppError("Appointment not found", 404);
+
+  return appointment;
+};
+
+exports.createAppointment = async ({
+  doctorId,
+  patientId,
+  date,
+  time,
+  notes,
+  duration,
+}) => {
+  if (!doctorId || !patientId || !date) {
+    throw new AppError("doctorId, patientId, and date are required", 400);
   }
+
+  const appointmentDate = new Date(date);
+  if (time) {
+    const [hours, minutes] = time.split(":").map(Number);
+    appointmentDate.setUTCHours(hours, minutes || 0, 0, 0);
+  }
+
+  if (Number.isNaN(appointmentDate.getTime())) {
+    throw new AppError("Invalid date or time format", 400);
+  }
+
+  const appointment = await Appointment.create({
+    doctorId,
+    patientId,
+    date: appointmentDate,
+    duration: duration || 30,
+    notes: notes || "",
+    status: "pending",
+  });
+
+  return appointment;
+};
+
+exports.findAppointment = async ({ patientId, doctorId, date }) => {
+  if (!patientId || !doctorId || !date) {
+    throw new AppError("patientId, doctorId, and date are required", 400);
+  }
+
+  const targetDate = new Date(date);
+  const startOfDay = new Date(targetDate);
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const endOfDay = new Date(targetDate);
+  endOfDay.setUTCHours(23, 59, 59, 999);
+
+  const appointment = await Appointment.findOne({
+    patientId,
+    doctorId,
+    date: { $gte: startOfDay, $lte: endOfDay },
+    status: { $in: ["pending", "confirmed"] },
+  });
+
+  return appointment;
+};
+
+exports.cancelAppointment = async (appointmentId) => {
+  if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
+    throw new AppError("Invalid appointment id", 400);
+  }
+
+  const appointment = await Appointment.findByIdAndUpdate(
+    appointmentId,
+    { status: "cancelled" },
+    { new: true },
+  );
+
+  if (!appointment) throw new AppError("Appointment not found", 404);
 
   return appointment;
 };
