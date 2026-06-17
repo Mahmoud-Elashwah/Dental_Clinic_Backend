@@ -22,18 +22,7 @@ exports.getAvailableSlots = async ({ date, doctorId } = {}) => {
     filter.doctorId = new mongoose.Types.ObjectId(doctorId.toString());
 
   const booked = await Appointment.find(filter).lean();
-  console.log(
-    "booked appointments:",
-    booked.length,
-    JSON.stringify(
-      booked.map((a) => ({
-        id: a._id,
-        date: a.date,
-        status: a.status,
-        doctorId: a.doctorId,
-      })),
-    ),
-  );
+
   const bookedTimes = new Set(
     booked.map((apt) => new Date(apt.date).getUTCHours()),
   );

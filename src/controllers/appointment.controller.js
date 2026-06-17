@@ -123,19 +123,18 @@ exports.getAppointmentById = catchAsync(async (req, res, next) => {
 // @access  Patient
 
 exports.createAppointment = catchAsync(async (req, res, next) => {
-  console.log("DOCTOR ID RECEIVED:", req.body.doctorId);
+
   
   const doctor = await User.findOne({
   _id: req.body.doctorId,
   role: "doctor"
 });
   // const doctor = await User.findById(new mongoose.Types.ObjectId(req.body.doctorId));
-  console.log("doctorId:", req.body.doctorId);
-console.log("typeof doctorId:", typeof req.body.doctorId);
+
  if (!doctor) {
   return next(new AppError(`Doctor not found: ${req.body.doctorId}`, 404));
 }
-  console.log("FOUND DOCTOR:", doctor);
+
   await assertNoConflict({
     doctorId: req.body.doctorId,
     date: req.body.date,

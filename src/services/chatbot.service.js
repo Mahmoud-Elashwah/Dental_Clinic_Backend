@@ -65,14 +65,13 @@ exports.handleUserMessage = async (message, { sessionKey, user }) => {
       let { doctorId } = aiIntent.data || {};
       const doctorName = aiIntent.data?.doctorName || null;
 
-      console.log("aiIntent.data:", JSON.stringify(aiIntent.data)); // ← ضيف
-      console.log("doctorName:", doctorName, "doctorId:", doctorId); // ← ضيف
+ 
 
       if (!doctorId && doctorName) {
         const doctors = await doctorsService.findDoctors({ name: doctorName });
-        console.log("doctors found:", doctors.length); // ← ضيف
+
         if (doctors.length) doctorId = doctors[0].id || doctors[0]._id;
-        console.log("doctorId after lookup:", doctorId); // ← ضيف
+
       }
 
       if (!date) {
@@ -175,11 +174,10 @@ exports.handleUserMessage = async (message, { sessionKey, user }) => {
 
     case "CANCEL_APPOINTMENT": {
       const rawAppointmentId = aiIntent.data?.appointmentId || null;
-      // تأكد إن الـ appointmentId MongoDB ObjectId صح
       const appointmentId = mongoose.Types.ObjectId.isValid(rawAppointmentId)
         ? rawAppointmentId
         : null;
-      console.log("appointmentId from ollama:", appointmentId);
+
       if (!user) {
         response = buildResponse({
           intent,
@@ -190,7 +188,7 @@ exports.handleUserMessage = async (message, { sessionKey, user }) => {
 
       let resolvedAppointmentId = appointmentId;
 
-      // لو مفيش appointmentId، ابحث بالـ doctor + date
+
       if (!resolvedAppointmentId) {
         const date = aiIntent.data?.date || null;
         let { doctorId } = aiIntent.data || {};
@@ -216,7 +214,7 @@ exports.handleUserMessage = async (message, { sessionKey, user }) => {
           doctorId,
           date,
         });
-        console.log("found appointment:", found);
+   
 
         if (!found) {
           response = buildResponse({

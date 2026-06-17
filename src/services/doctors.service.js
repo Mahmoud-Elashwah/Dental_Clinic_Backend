@@ -19,12 +19,12 @@ exports.findDoctors = async ({ specialization, name } = {}) => {
   const filter = { role: "doctor" };
   if (specialization) filter.specialization = specialization;
   if (name) filter.name = { $regex: name.split(" ").join("|"), $options: "i" };
-  console.log("findDoctors filter:", JSON.stringify(filter));
+
   const doctors = await User.find(filter).select("-password").lean();
-  console.log("doctors found:", doctors.length); // ← وده
+
   const doctorIds = doctors.map((d) => d._id);
 
-  // جيب كل الـ reviews في query وحدة
+
   const allReviews = await Review.find({ doctorId: { $in: doctorIds } }).lean();
 
   return doctors.map((doctor) => {

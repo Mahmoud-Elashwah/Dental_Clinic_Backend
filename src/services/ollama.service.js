@@ -15,26 +15,18 @@ const VALID_INTENTS = [
   "UNKNOWN",
 ];
 
-const MAX_MEMORY_TURNS = 10; // keep last 5 user/assistant pairs
+const MAX_MEMORY_TURNS = 10;
 
-/**
- * Sanitizes user input to prevent prompt injection attacks.
- * Strips characters commonly used to break out of prompt context.
- */
 const sanitizeInput = (text) => {
   if (typeof text !== "string") return "";
   return text
-    .replace(/[\r\n]{3,}/g, "\n\n") // collapse excessive newlines
-    .replace(/[^\S\r\n]{4,}/g, "   ") // collapse excessive spaces
-    .replace(/<\|.*?\|>/g, "") // strip LLaMA special tokens e.g. <|im_start|>
+    .replace(/[\r\n]{3,}/g, "\n\n")
+    .replace(/[^\S\r\n]{4,}/g, "   ")
+    .replace(/<\|.*?\|>/g, "")
     .trim()
-    .slice(0, 1000); // hard cap per message
+    .slice(0, 1000);
 };
 
-/**
- * Builds the structured prompt sent to Ollama.
- * Memory is capped to avoid token limit issues.
- */
 const buildPrompt = (message, memory = []) => {
   const recentMemory = memory.slice(-MAX_MEMORY_TURNS);
 
@@ -96,10 +88,6 @@ Additional rules:
 `;
 };
 
-/**
- * Extracts the raw text response from Ollama's /api/generate response.
- * Ollama with stream:false always returns { response: string }.
- */
 const extractTextFromOllama = (data) => {
   if (!data) throw new Error("Empty response from Ollama.");
 
@@ -107,7 +95,6 @@ const extractTextFromOllama = (data) => {
     return data.response;
   }
 
-  // Fallback: stringify entire payload so parseJson can attempt extraction
   const fallback = JSON.stringify(data);
   console.warn(
     "Ollama response missing expected `response` field. Raw payload:",
@@ -116,10 +103,6 @@ const extractTextFromOllama = (data) => {
   return fallback;
 };
 
-/**
- * Extracts the first valid JSON object from a string.
- * Handles cases where the model wraps output in prose or code fences.
- */
 const parseJson = (rawText) => {
   const trimmed = String(rawText || "").trim();
   const firstBrace = trimmed.indexOf("{");
@@ -133,10 +116,6 @@ const parseJson = (rawText) => {
   return JSON.parse(candidate);
 };
 
-/**
- * Validates and normalises the parsed assistant response.
- * Returns a guaranteed safe object regardless of what the model returned.
- */
 const validateAssistantResponse = (parsed) => {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("Parsed response is not a plain object.");
@@ -171,13 +150,6 @@ const validateAssistantResponse = (parsed) => {
   return { intent, message, data };
 };
 
-/**
- * Classifies a user message into a structured intent object.
- *
- * @param {string} message - The raw user message.
- * @param {Array<{role: string, text: string}>} memory - Conversation history.
- * @returns {Promise<{intent: string, message: string, data: object}>}
- */
 exports.classifyIntent = async (message, memory = []) => {
   const prompt = buildPrompt(message, memory);
 

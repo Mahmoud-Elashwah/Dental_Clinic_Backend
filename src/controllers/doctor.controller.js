@@ -223,8 +223,7 @@ exports.addDoctor = catchAsync(async (req, res, next) => {
       avatarUrl,
       specialization
     } = req.body;
-console.log(req.body);
-console.log(password);
+
     const doctor = await User.create({
     name,
     email,
