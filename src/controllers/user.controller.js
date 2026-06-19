@@ -1,6 +1,6 @@
 const User = require("../models/Users");
 const catchAsync = require("../utils/CatchAsync");
-const appError = require("../utils/AppError");
+const AppError = require("../utils/AppError");
 const APIFeatures = require("../utils/apiFeatures.js");
 
 //get all users by admin
@@ -23,12 +23,12 @@ exports.getAllUsers = catchAsync(async (req, res, next) => {
 //get user by admin or own profile
 exports.getUser = catchAsync(async (req, res, next) => {
   const { id } = req.params;
-  if (req.user.role !== "admin" && req.user.id !== id) {
+  if (req.user.role !== "admin" && req.user._id.toString() !== id) {
     return next(new AppError("You are not allowed to access this user", 403));
   }
   const user = await User.findById(id);
   if (!user) {
-    return next(new appError("User not found", 404));
+    return next(new AppError("User not found", 404));
   }
   res.status(200).json({
     status: "success",
@@ -46,7 +46,7 @@ exports.getUser = catchAsync(async (req, res, next) => {
 exports.updateUser = catchAsync(async (req, res, next) => {
   const { id } = req.params;
 
-  if (req.user.role !== "admin" && req.user.id !== id) {
+  if (req.user.role !== "admin" && req.user._id.toString() !== id) {
     return next(new AppError("Not allowed", 403));
   }
 
@@ -57,6 +57,8 @@ exports.updateUser = catchAsync(async (req, res, next) => {
     bio: req.body.bio,
     avatarUrl: req.body.avatarUrl,
     specialization: req.body.specialization,
+    workingHours: req.body.workingHours,
+    slotDuration: req.body.slotDuration,
   };
 
   const user = await User.findByIdAndUpdate(
@@ -80,7 +82,7 @@ exports.updateUser = catchAsync(async (req, res, next) => {
 exports.DeleteUser = catchAsync(async (req, res, next) => {
   const user = await User.findByIdAndDelete(req.params.id);
   if (!user) {
-    return next(new appError("User not found", 404));
+    return next(new AppError("User not found", 404));
   }
   res.status(200).json({
     status: "success",

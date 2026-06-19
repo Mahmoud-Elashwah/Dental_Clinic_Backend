@@ -1,5 +1,6 @@
 const Doctor = require("../models/Doctor");
 const User = require("../models/Users");
+const Appointment = require("../models/Appointment");
 const catchAsync = require("../utils/CatchAsync");
 const AppError = require("../utils/AppError");
 
@@ -139,7 +140,7 @@ exports.getAvailability = catchAsync(async (req, res, next) => {
   const doctor = await User.findOne({
   _id: req.params.id,
   role: "doctor",
-  isActive: true
+  isActive: { $ne: false }
 });
 
   if (!doctor) {
@@ -148,7 +149,7 @@ exports.getAvailability = catchAsync(async (req, res, next) => {
 
   // 3) Determine the day key (sun=0 … sat=6)
   const dayKey = DAY_KEYS[requestedDate.getDay()];
-  const daySchedule = doctor.workingHours[dayKey];
+  const daySchedule = doctor.workingHours ? doctor.workingHours[dayKey] : null;
 
   // 4) If the doctor is off that day, return empty slots
   if (!daySchedule || daySchedule.isOff) {
@@ -164,31 +165,49 @@ exports.getAvailability = catchAsync(async (req, res, next) => {
     });
   }
 
-  // 5) Generate time slots
-  const startMinutes = timeToMinutes(daySchedule.start);
-  const endMinutes = timeToMinutes(daySchedule.end);
-  const { slotDuration } = doctor;
-  const slots = [];
+    // 5) Generate time slots
+    const startMinutes = timeToMinutes(daySchedule.start);
+    const endMinutes = timeToMinutes(daySchedule.end);
+    const { slotDuration } = doctor;
+    let slots = [];
+  
+    for (let t = startMinutes; t + slotDuration <= endMinutes; t += slotDuration) {
+      slots.push({
+        start: minutesToTime(t),
+        end: minutesToTime(t + slotDuration),
+      });
+    }
 
-  for (let t = startMinutes; t + slotDuration <= endMinutes; t += slotDuration) {
-    slots.push({
-      start: minutesToTime(t),
-      end: minutesToTime(t + slotDuration),
+    // 6) Filter out booked appointments
+    const [year, month, day] = date.split("-").map(Number);
+    const startOfDay = new Date(year, month - 1, day, 0, 0, 0);
+    const endOfDay = new Date(year, month - 1, day, 23, 59, 59);
+
+    const existingAppointments = await Appointment.find({
+      doctorId: doctor._id,
+      date: { $gte: startOfDay, $lte: endOfDay },
+      status: { $ne: "cancelled" }
     });
-  }
 
-  res.status(200).json({
-    status: "success",
-    data: {
-      doctor: doctor.name,
-      date,
-      dayOfWeek: dayKey,
-      isOff: false,
-      slotDuration,
-      totalSlots: slots.length,
-      slots,
-    },
-  });
+    const bookedStartTimes = existingAppointments.map(app => {
+      const d = new Date(app.date);
+      return minutesToTime(d.getHours() * 60 + d.getMinutes());
+    });
+
+    slots = slots.filter(slot => !bookedStartTimes.includes(slot.start));
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        doctor: doctor.name,
+        date,
+        dayOfWeek: dayKey,
+        isOff: false,
+        slotDuration,
+        totalSlots: slots.length,
+        slots,
+      },
+    });
 });
 
 

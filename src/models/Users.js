@@ -51,21 +51,67 @@ avatarUrl: {
   default: "",
 },
 
-specialization: {
-  type: String,
-  enum: [
-    "General Dentistry",
-    "Orthodontics",
-    "Endodontics",
-    "Periodontics",
-    "Prosthodontics",
-    "Oral Surgery",
-    "Pediatric Dentistry",
-    "Cosmetic Dentistry",
-  ],
-  default: null,
-},
-    phone: { type: String },
+  specialization: {
+    type: String,
+    enum: [
+      "General Dentistry",
+      "Orthodontics",
+      "Endodontics",
+      "Periodontics",
+      "Prosthodontics",
+      "Oral Surgery",
+      "Pediatric Dentistry",
+      "Cosmetic Dentistry",
+    ],
+    default: null,
+  },
+  
+  workingHours: {
+    sun: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
+      isOff: { type: Boolean, default: false },
+    },
+    mon: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
+      isOff: { type: Boolean, default: false },
+    },
+    tue: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
+      isOff: { type: Boolean, default: false },
+    },
+    wed: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
+      isOff: { type: Boolean, default: false },
+    },
+    thu: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
+      isOff: { type: Boolean, default: false },
+    },
+    fri: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
+      isOff: { type: Boolean, default: false },
+    },
+    sat: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
+      isOff: { type: Boolean, default: false },
+    },
+  },
+
+  slotDuration: {
+    type: Number,
+    default: 30,
+    min: [15, "Slot duration must be at least 15 minutes"],
+    max: [120, "Slot duration cannot exceed 120 minutes"],
+  },
+
+  phone: { type: String },
 
     dateOfBirth: { type: Date },
 
