@@ -3,15 +3,24 @@ const appError = require("../utils/AppError");
 const Message = require("../models/Message");
 
 exports.sendMessage = catchAsync(async (req, res, next) => {
-  const { chatId, content } = req.body;
+  const { chatId, content, fileData, fileName, fileType } = req.body;
 
   // Validation + Business logic
-  if (!chatId || !content?.trim()) {
-    return next(new appError("Chat ID and content are required", 400));
+  if (!chatId || (!content?.trim() && !fileData)) {
+    return next(new appError("Chat ID and content or file are required", 400));
   }
 
   // verify chat existence and access rights
-  if (req.user.role !== "admin" && req.user.role !== "patient") {
+  const Chat = require("../models/Chat");
+  const chat = await Chat.findById(chatId);
+  if (!chat) {
+    return next(new appError("Chat not found", 404));
+  }
+
+  if (
+    chat.doctorId.toString() !== req.user.id &&
+    chat.patientId.toString() !== req.user.id
+  ) {
     return next(new appError("Not allowed", 403));
   }
 
@@ -19,7 +28,10 @@ exports.sendMessage = catchAsync(async (req, res, next) => {
     chatId,
     senderId: req.user.id,
     senderRole: req.user.role,
-    content: content.trim(),
+    content: content ? content.trim() : "",
+    fileData,
+    fileName,
+    fileType,
   });
 
   // Populate sender details for response
@@ -41,6 +53,67 @@ exports.sendMessage = catchAsync(async (req, res, next) => {
   res.status(201).json({
     status: "success",
     data: message,
+  });
+});
+
+// Edit message
+exports.editMessage = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const { content } = req.body;
+
+  if (!content?.trim()) {
+    return next(new appError("Content is required for editing", 400));
+  }
+
+  const message = await Message.findById(id);
+  if (!message) {
+    return next(new appError("Message not found", 404));
+  }
+
+  if (message.senderId.toString() !== req.user.id) {
+    return next(new appError("Not allowed to edit this message", 403));
+  }
+
+  message.content = content.trim();
+  message.isEdited = true;
+  await message.save();
+
+  const populatedMessage = await Message.findById(message._id).populate("senderId", "name role");
+
+  const io = req.app.get("io");
+  if (io) {
+    io.to(message.chatId.toString()).emit("messageEdited", populatedMessage);
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: populatedMessage,
+  });
+});
+
+// Delete message
+exports.deleteMessage = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+
+  const message = await Message.findById(id);
+  if (!message) {
+    return next(new appError("Message not found", 404));
+  }
+
+  if (message.senderId.toString() !== req.user.id) {
+    return next(new appError("Not allowed to delete this message", 403));
+  }
+
+  await message.deleteOne();
+
+  const io = req.app.get("io");
+  if (io) {
+    io.to(message.chatId.toString()).emit("messageDeleted", id);
+  }
+
+  res.status(204).json({
+    status: "success",
+    data: null,
   });
 });
 

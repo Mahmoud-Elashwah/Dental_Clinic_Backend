@@ -23,8 +23,19 @@ module.exports = (io) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    socket.user = decoded;
-    next();
+    
+    // Fetch user to get role
+    const User = require("../models/Users");
+    User.findById(decoded.id).then(user => {
+      if (!user) {
+        return next(new Error("Authentication error: User not found"));
+      }
+      socket.user = { id: decoded.id, role: user.role };
+      next();
+    }).catch(err => {
+      console.log("Socket DB error:", err.message);
+      next(new Error("Authentication error: Database error"));
+    });
   } catch (err) {
     console.log("Socket auth error:", err.message);
     next(new Error("Invalid or expired token"));
@@ -44,9 +55,9 @@ module.exports = (io) => {
           return socket.emit("error", "Chat not found");
         }
 
-        // Check if user is part of the chat (either admin or patient)
+        // Check if user is part of the chat (either doctor or patient)
         const isAllowed =
-          socket.user.role === "admin" ||
+          (socket.user.role === "doctor" && chat.doctorId.toString() === socket.user.id) ||
           chat.patientId.toString() === socket.user.id;
 
         if (!isAllowed) {
@@ -72,9 +83,9 @@ module.exports = (io) => {
 
   if (!chat) return;
 
-  // Check if user is part of the chat (either admin or patient)
+  // Check if user is part of the chat (either doctor or patient)
   const isAllowed =
-    socket.user.role === "admin" ||
+    (socket.user.role === "doctor" && chat.doctorId.toString() === socket.user.id) ||
     chat.patientId.toString() === socket.user.id;
 
   if (!isAllowed) return;
@@ -88,7 +99,7 @@ module.exports = (io) => {
 
     // Disconnect
     socket.on("disconnect", () => {
-      console.log(`❌ User disconnected: ${socket.user?.id}`);
+      console.log(`?? User disconnected: ${socket.user?.id}`);
     });
   });
 };

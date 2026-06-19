@@ -1,0 +1,19 @@
+◇ injecting env (13) from .env // tip: ⌘ override existing { override: true }
+◇ injecting env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injecting env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+MongoDB connected
+🚀 Server is running on port:3000
+📡 Socket.io is listening
+User connected: 6a2ebed2ba5f4b72ebbd716e
+User 6a2ebed2ba5f4b72ebbd716e joined chat 6a3554264f2e3c79fe7ec810
+?? User disconnected: 6a2ebed2ba5f4b72ebbd716e
+User connected: 6a2ebed2ba5f4b72ebbd716e
+User 6a2ebed2ba5f4b72ebbd716e joined chat 6a3554264f2e3c79fe7ec810
+?? User disconnected: 6a2ebed2ba5f4b72ebbd716e
+User connected: 6a2ebed2ba5f4b72ebbd716e
+User 6a2ebed2ba5f4b72ebbd716e joined chat 6a3554264f2e3c79fe7ec810
+User connected: 6a2ebed2ba5f4b72ebbd716e
+User 6a2ebed2ba5f4b72ebbd716e joined chat 6a3554264f2e3c79fe7ec810
+?? User disconnected: 6a2ebed2ba5f4b72ebbd716e
+User connected: 6a2ebed2ba5f4b72ebbd716e
+User 6a2ebed2ba5f4b72ebbd716e joined chat 6a3554264f2e3c79fe7ec810

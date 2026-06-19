@@ -18,14 +18,28 @@ const messageSchema = new mongoose.Schema(
 
     senderRole: {
       type: String,
-      enum: ["patient", "admin"],
+      enum: ["patient", "doctor"],
       required: true,
     },
 
     content: {
       type: String,
-      required: true,
       maxlength: 2000,
+    },
+
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
+
+    fileData: {
+      type: String, // Base64 string
+    },
+    fileName: {
+      type: String,
+    },
+    fileType: {
+      type: String, // MIME type like image/png, application/pdf
     },
 
     isRead: {
@@ -38,7 +52,6 @@ const messageSchema = new mongoose.Schema(
 
 messageSchema.index({ chatId: 1, createdAt: -1 });
 
-
 messageSchema.post("save", async function (doc) {
   const isPatientSender = doc.senderRole === "patient";
 
@@ -47,7 +60,7 @@ messageSchema.post("save", async function (doc) {
     lastMessageAt: doc.createdAt,
     lastMessageSenderRole: doc.senderRole,
     $inc: isPatientSender 
-      ? { unreadByAdmin: 1 } 
+      ? { unreadByDoctor: 1 } 
       : { unreadByPatient: 1 },
   });
 });

@@ -9,6 +9,13 @@ const chatSchema = new mongoose.Schema(
       index: true,
     },
 
+    doctorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+
     lastMessage: {
       type: String,
       maxlength: 60,
@@ -26,7 +33,7 @@ const chatSchema = new mongoose.Schema(
       default: true,
     },
 
-    unreadByAdmin: {
+    unreadByDoctor: {
       type: Number,
       default: 0,
     },
@@ -36,15 +43,12 @@ const chatSchema = new mongoose.Schema(
       default: 0,
     },
 
-    adminId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-
-    lastMessageSenderRole: { type: String, enum: ["patient", "admin"] },
+    lastMessageSenderRole: { type: String, enum: ["patient", "doctor"] },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );
+
+// Ensure one chat per patient-doctor pair
+chatSchema.index({ patientId: 1, doctorId: 1 }, { unique: true });
 
 module.exports = mongoose.model("Chat", chatSchema);
