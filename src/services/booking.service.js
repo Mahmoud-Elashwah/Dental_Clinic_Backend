@@ -24,7 +24,7 @@ exports.getAvailableSlots = async ({ date, doctorId } = {}) => {
   const booked = await Appointment.find(filter).lean();
 
   const bookedTimes = new Set(
-    booked.map((apt) => new Date(apt.date).getUTCHours()),
+    booked.map((apt) => (new Date(apt.date).getUTCHours() + 3) % 24),
   );
 
   const allSlots = Array.from({ length: 9 }, (_, i) => i + 9);
@@ -32,7 +32,7 @@ exports.getAvailableSlots = async ({ date, doctorId } = {}) => {
     .filter((hour) => !bookedTimes.has(hour))
     .map((hour) => {
       const slotDate = new Date(targetDate);
-      slotDate.setUTCHours(hour, 0, 0, 0);
+      slotDate.setUTCHours(hour - 3, 0, 0, 0);
       return { time: slotDate, hour: `${hour}:00` };
     });
 
@@ -68,7 +68,7 @@ exports.createAppointment = async ({
   const appointmentDate = new Date(date);
   if (time) {
     const [hours, minutes] = time.split(":").map(Number);
-    appointmentDate.setUTCHours(hours, minutes || 0, 0, 0);
+    appointmentDate.setUTCHours(hours - 3, minutes || 0, 0, 0);
   }
 
   if (Number.isNaN(appointmentDate.getTime())) {

@@ -1,10 +1,10 @@
 {
-	"folders": [
-		{
-			"path": "."
-		},
-		{
-			"path": "../fronted_dental"
-		}
-	]
+  "folders": [
+    {
+      "path": ".",
+    },
+    {
+      "path": "../fronted_dental",
+    },
+  ],
 }

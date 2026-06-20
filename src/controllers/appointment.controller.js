@@ -30,7 +30,10 @@ const hasOverlap = async ({ doctorId, date, duration, excludeId }) => {
 const assertNoConflict = async (payload, excludeId) => {
   const overlap = await hasOverlap({ ...payload, excludeId });
   if (overlap) {
-    throw new AppError("This time slot overlaps an existing appointment for that doctor", 409);
+    throw new AppError(
+      "This time slot overlaps an existing appointment for that doctor",
+      409,
+    );
   }
 };
 
@@ -66,7 +69,6 @@ exports.getAllAppointments = catchAsync(async (req, res, next) => {
   });
 });
 
-
 // @desc    Current patient's appointments
 // @route   GET /api/v1/appointments/me
 // @access  Patient
@@ -75,7 +77,10 @@ exports.getMyAppointments = catchAsync(async (req, res, next) => {
   const appointments = await Appointment.find({ patientId: req.user._id })
     .sort({ date: -1 })
     .select("-__v")
-    .populate({ path: "doctorId", select: "name email specialization avatarUrl" });
+    .populate({
+      path: "doctorId",
+      select: "name email specialization avatarUrl",
+    });
 
   res.status(200).json({
     status: "success",
@@ -95,7 +100,10 @@ exports.getAppointmentById = catchAsync(async (req, res, next) => {
 
   let query = Appointment.findById(req.params.id)
     .populate({ path: "patientId", select: "name email phone dateOfBirth" })
-    .populate({ path: "doctorId", select: "name email specialization avatarUrl workingHours slotDuration" });
+    .populate({
+      path: "doctorId",
+      select: "name email specialization avatarUrl workingHours slotDuration",
+    });
 
   if (req.user.role === "admin") {
     query = query.select("+adminNotes");
@@ -107,9 +115,14 @@ exports.getAppointmentById = catchAsync(async (req, res, next) => {
     return next(new AppError("No appointment found with that ID", 404));
   }
 
-  const ownerId = appointment.patientId.id || appointment.patientId._id || appointment.patientId;
+  const ownerId =
+    appointment.patientId.id ||
+    appointment.patientId._id ||
+    appointment.patientId;
   if (req.user.role !== "admin" && ownerId.toString() !== req.user.id) {
-    return next(new AppError("You are not allowed to access this appointment", 403));
+    return next(
+      new AppError("You are not allowed to access this appointment", 403),
+    );
   }
 
   res.status(200).json({
@@ -123,17 +136,15 @@ exports.getAppointmentById = catchAsync(async (req, res, next) => {
 // @access  Patient
 
 exports.createAppointment = catchAsync(async (req, res, next) => {
-
-  
   const doctor = await User.findOne({
-  _id: req.body.doctorId,
-  role: "doctor"
-});
+    _id: req.body.doctorId,
+    role: "doctor",
+  });
   // const doctor = await User.findById(new mongoose.Types.ObjectId(req.body.doctorId));
 
- if (!doctor) {
-  return next(new AppError(`Doctor not found: ${req.body.doctorId}`, 404));
-}
+  if (!doctor) {
+    return next(new AppError(`Doctor not found: ${req.body.doctorId}`, 404));
+  }
 
   await assertNoConflict({
     doctorId: req.body.doctorId,
@@ -150,8 +161,10 @@ exports.createAppointment = catchAsync(async (req, res, next) => {
     status: "pending",
   });
 
-  const populated = await Appointment.findById(appointment._id)
-    .populate({ path: "doctorId", select: "name email specialization" });
+  const populated = await Appointment.findById(appointment._id).populate({
+    path: "doctorId",
+    select: "name email specialization",
+  });
 
   res.status(201).json({
     status: "success",
@@ -168,40 +181,42 @@ exports.updateAppointment = catchAsync(async (req, res, next) => {
     return next(new AppError("Invalid appointment id", 400));
   }
 
-  const appointment = await Appointment.findById(req.params.id).select("+adminNotes");
+  const appointment = await Appointment.findById(req.params.id).select(
+    "+adminNotes",
+  );
   if (!appointment) {
     return next(new AppError("No appointment found with that ID", 404));
   }
 
   const isAdmin = req.user.role === "admin";
 
-  const isOwner =
-    appointment.patientId.toString() === req.user.id;
+  const isOwner = appointment.patientId.toString() === req.user.id;
 
-    const isDoctor =
-  req.user.role === "doctor" &&
-  appointment.doctorId.toString() === req.user.id;
+  const isDoctor =
+    req.user.role === "doctor" &&
+    appointment.doctorId.toString() === req.user.id;
 
-const { date, duration, notes, status, adminNotes, notificationSent } = req.body;
+  const { date, duration, notes, status, adminNotes, notificationSent } =
+    req.body;
 
-if (isDoctor) {
-  if (status !== undefined) {
-    appointment.status = status;
+  if (isDoctor) {
+    if (status !== undefined) {
+      appointment.status = status;
+    }
+
+    await appointment.save();
+
+    return res.status(200).json({
+      status: "success",
+      data: { appointment },
+    });
   }
 
-  await appointment.save();
-
-  return res.status(200).json({
-    status: "success",
-    data: { appointment },
-  });
-}
-
-if (!isAdmin && !isOwner && !isDoctor) {
-    return next(new AppError("You are not allowed to update this appointment", 403));
+  if (!isAdmin && !isOwner && !isDoctor) {
+    return next(
+      new AppError("You are not allowed to update this appointment", 403),
+    );
   }
-
-  
 
   if (isAdmin) {
     if (date !== undefined) appointment.date = date;
@@ -209,7 +224,8 @@ if (!isAdmin && !isOwner && !isDoctor) {
     if (notes !== undefined) appointment.notes = notes;
     if (status !== undefined) appointment.status = status;
     if (adminNotes !== undefined) appointment.adminNotes = adminNotes;
-    if (notificationSent !== undefined) appointment.notificationSent = notificationSent;
+    if (notificationSent !== undefined)
+      appointment.notificationSent = notificationSent;
 
     if (appointment.isModified("date") || appointment.isModified("duration")) {
       if (ACTIVE_BOOKING_STATUSES.includes(appointment.status)) {
@@ -224,12 +240,21 @@ if (!isAdmin && !isOwner && !isDoctor) {
       }
     }
   } else {
-    if (status !== undefined || adminNotes !== undefined || notificationSent !== undefined) {
+    if (
+      status !== undefined ||
+      adminNotes !== undefined ||
+      notificationSent !== undefined
+    ) {
       return next(new AppError("You cannot update those fields", 403));
     }
 
     if (!["pending", "confirmed"].includes(appointment.status)) {
-      return next(new AppError("Only pending appointments can be updated by the patient", 400));
+      return next(
+        new AppError(
+          "Only pending appointments can be updated by the patient",
+          400,
+        ),
+      );
     }
 
     if (date !== undefined) appointment.date = date;
@@ -248,14 +273,14 @@ if (!isAdmin && !isOwner && !isDoctor) {
     }
   }
 
- const doctor = await User.findOne({
-  _id: appointment.doctorId,
-  role: "doctor",
-});
+  const doctor = await User.findOne({
+    _id: appointment.doctorId,
+    role: "doctor",
+  });
 
-if (!doctor) {
-  return next(new AppError("Doctor is no longer available", 400));
-}
+  if (!doctor) {
+    return next(new AppError("Doctor is no longer available", 400));
+  }
 
   await appointment.save();
 
@@ -278,7 +303,9 @@ if (!doctor) {
 exports.getAvailableSlots = catchAsync(async (req, res, next) => {
   const { date } = req.query;
   if (!date) {
-    return next(new AppError("Please provide a date query parameter (YYYY-MM-DD)", 400));
+    return next(
+      new AppError("Please provide a date query parameter (YYYY-MM-DD)", 400),
+    );
   }
 
   const targetDate = new Date(date);
@@ -296,7 +323,8 @@ exports.getAvailableSlots = catchAsync(async (req, res, next) => {
 
   const availableSlots = doctors.map((doc) => {
     const schedule = doc.workingHours[dayKey];
-    if (!schedule || schedule.isOff) return { doctorId: doc._id, doctorName: doc.name, slots: [] };
+    if (!schedule || schedule.isOff)
+      return { doctorId: doc._id, doctorName: doc.name, slots: [] };
 
     const slots = [];
     let current = new Date(date);
@@ -315,7 +343,7 @@ exports.getAvailableSlots = catchAsync(async (req, res, next) => {
         (apt) =>
           apt.doctorId.toString() === doc._id.toString() &&
           apt.date.getTime() < nextSlot.getTime() &&
-          slotEnd(apt.date, apt.duration).getTime() > current.getTime()
+          slotEnd(apt.date, apt.duration).getTime() > current.getTime(),
       );
 
       if (!isTaken) {
@@ -372,8 +400,10 @@ exports.getPatientAppointments = catchAsync(async (req, res, next) => {
     return next(new AppError("You can only access your own appointments", 403));
   }
 
-  const appointments = await Appointment.find({ patientId })
-    .populate({ path: "doctorId", select: "name email specialization" });
+  const appointments = await Appointment.find({ patientId }).populate({
+    path: "doctorId",
+    select: "name email specialization",
+  });
 
   res.status(200).json({
     status: "success",
@@ -388,16 +418,15 @@ exports.getPatientAppointments = catchAsync(async (req, res, next) => {
 
 exports.getDoctorAppointments = catchAsync(async (req, res, next) => {
   const { doctorId } = req.params;
-  
-    if (
-    req.user.role === "doctor" &&
-    req.user.id !== doctorId
-  ) {
+
+  if (req.user.role === "doctor" && req.user.id !== doctorId) {
     return next(new AppError("Unauthorized", 403));
   }
 
-  const appointments = await Appointment.find({ doctorId })
-    .populate({ path: "patientId", select: "name email phone" });
+  const appointments = await Appointment.find({ doctorId }).populate({
+    path: "patientId",
+    select: "name email phone",
+  });
 
   res.status(200).json({
     status: "success",
@@ -405,7 +434,6 @@ exports.getDoctorAppointments = catchAsync(async (req, res, next) => {
     data: { appointments },
   });
 });
-
 
 // @desc    Cancel appointment
 // @route   PATCH /api/v1/appointments/:id/cancel
@@ -425,7 +453,9 @@ exports.cancelAppointment = catchAsync(async (req, res, next) => {
   const isOwner = appointment.patientId.toString() === req.user.id;
 
   if (!isAdmin && !isOwner) {
-    return next(new AppError("You are not allowed to cancel this appointment", 403));
+    return next(
+      new AppError("You are not allowed to cancel this appointment", 403),
+    );
   }
 
   if (["cancelled", "completed"].includes(appointment.status)) {
