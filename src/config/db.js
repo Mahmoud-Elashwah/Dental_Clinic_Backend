@@ -2,12 +2,27 @@ const mongoose = require("mongoose");
 require("dotenv").config({ path: ".env" });
 
 const connectDB = async () => {
+  const mongoUri =
+    process.env.MONGO_URI ||
+    (process.env.NODE_ENV === "production"
+      ? null
+      : "mongodb://127.0.0.1:27017/dental_clinic");
+
+  if (!mongoUri) {
+    throw new Error("MONGO_URI must be configured in production.");
+  }
+
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+    });
     console.log("MongoDB connected");
   } catch (error) {
-    console.error("Error connecting to MongoDB:", error);
-    process.exit(1);
+    console.error("MongoDB connection failed.", {
+      name: error.name,
+      code: error.code,
+    });
+    throw error;
   }
 };
 
