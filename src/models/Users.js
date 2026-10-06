@@ -3,6 +3,20 @@ const validator = require("validator");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 
+const PRIVATE_USER_FIELDS = [
+  "password",
+  "refreshToken",
+  "tokenVersion",
+  "passwordChangetAt",
+  "resetpasswordToken",
+  "resetpasswordExpire",
+  "verificationCode",
+  "otpExpire",
+  "otpPurpose",
+  "failedLoginAttempts",
+  "lockedUntil",
+];
+
 // Define the User schema
 const userSchema = new mongoose.Schema(
   {
@@ -15,13 +29,9 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: [true, "Please provide an email"],
-      unique: [true, "Email already exists"],
+      unique: true,
       validate: [validator.isEmail, "not valid email or password"],
-      lowercase: [true, "Email must be lowercase"],
-      match: [
-        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-        "Please fill a valid email address",
-      ],
+      lowercase: true,
     },
 
     password: {
@@ -36,87 +46,96 @@ const userSchema = new mongoose.Schema(
       enum: ["admin", "patient", "doctor"],
       default: "patient",
     },
-    doctorProfile: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Doctor",
+    isActive: {
+      type: Boolean,
+      default: true,
     },
     bio: {
-  type: String,
-  maxlength: 500,
-  default: "",
-},
+      type: String,
+      maxlength: 500,
+      default: "",
+    },
 
-avatarUrl: {
-  type: String,
-  default: "",
-},
+    avatarUrl: {
+      type: String,
+      default: "",
+    },
 
-  specialization: {
-    type: String,
-    enum: [
-      "General Dentistry",
-      "Orthodontics",
-      "Endodontics",
-      "Periodontics",
-      "Prosthodontics",
-      "Oral Surgery",
-      "Pediatric Dentistry",
-      "Cosmetic Dentistry",
-    ],
-    default: null,
-  },
-  
-  workingHours: {
-    sun: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "17:00" },
-      isOff: { type: Boolean, default: false },
+    specialization: {
+      type: String,
+      enum: [
+        "General Dentistry",
+        "Orthodontics",
+        "Endodontics",
+        "Periodontics",
+        "Prosthodontics",
+        "Oral Surgery",
+        "Pediatric Dentistry",
+        "Cosmetic Dentistry",
+      ],
+      default: null,
     },
-    mon: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "17:00" },
-      isOff: { type: Boolean, default: false },
-    },
-    tue: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "17:00" },
-      isOff: { type: Boolean, default: false },
-    },
-    wed: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "17:00" },
-      isOff: { type: Boolean, default: false },
-    },
-    thu: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "17:00" },
-      isOff: { type: Boolean, default: false },
-    },
-    fri: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "17:00" },
-      isOff: { type: Boolean, default: false },
-    },
-    sat: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "17:00" },
-      isOff: { type: Boolean, default: false },
-    },
-  },
 
-  slotDuration: {
-    type: Number,
-    default: 30,
-    min: [15, "Slot duration must be at least 15 minutes"],
-    max: [120, "Slot duration cannot exceed 120 minutes"],
-  },
+    workingHours: {
+      sun: {
+        start: { type: String, default: "09:00" },
+        end: { type: String, default: "17:00" },
+        isOff: { type: Boolean, default: false },
+      },
+      mon: {
+        start: { type: String, default: "09:00" },
+        end: { type: String, default: "17:00" },
+        isOff: { type: Boolean, default: false },
+      },
+      tue: {
+        start: { type: String, default: "09:00" },
+        end: { type: String, default: "17:00" },
+        isOff: { type: Boolean, default: false },
+      },
+      wed: {
+        start: { type: String, default: "09:00" },
+        end: { type: String, default: "17:00" },
+        isOff: { type: Boolean, default: false },
+      },
+      thu: {
+        start: { type: String, default: "09:00" },
+        end: { type: String, default: "17:00" },
+        isOff: { type: Boolean, default: false },
+      },
+      fri: {
+        start: { type: String, default: "09:00" },
+        end: { type: String, default: "17:00" },
+        isOff: { type: Boolean, default: false },
+      },
+      sat: {
+        start: { type: String, default: "09:00" },
+        end: { type: String, default: "17:00" },
+        isOff: { type: Boolean, default: false },
+      },
+    },
 
-  phone: { type: String },
+    slotDuration: {
+      type: Number,
+      default: 30,
+      validate: {
+        validator: (duration) => duration % 15 === 0,
+        message: "Slot duration must use 15-minute increments",
+      },
+      min: [15, "Slot duration must be at least 15 minutes"],
+      max: [120, "Slot duration cannot exceed 120 minutes"],
+    },
+
+    phone: { type: String },
 
     dateOfBirth: { type: Date },
 
     refreshToken: {
       type: String,
+      select: false,
+    },
+    tokenVersion: {
+      type: Number,
+      default: 0,
       select: false,
     },
 
@@ -134,7 +153,7 @@ avatarUrl: {
       type: Date,
       select: false,
     },
-    
+
     verificationCode: {
       type: String,
       select: false,
@@ -142,6 +161,7 @@ avatarUrl: {
     otpPurpose: {
       type: String,
       enum: ["FORGOT_PASSWORD", "EMAIL_VERIFICATION"],
+      select: false,
     },
     otpExpire: {
       type: Date,
@@ -150,13 +170,22 @@ avatarUrl: {
     failedLoginAttempts: {
       type: Number,
       default: 0,
+      select: false,
     },
     lockedUntil: {
       type: Date,
+      select: false,
     },
-    
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+    toJSON: {
+      transform: (doc, value) => {
+        for (const field of PRIVATE_USER_FIELDS) delete value[field];
+        return value;
+      },
+    },
+  },
 );
 
 // Update password change timestamp before saving if password is modified
@@ -164,6 +193,8 @@ userSchema.pre("save", async function () {
   if (!this.isModified("password") || this.isNew) return;
   this.passwordChangetAt = Date.now() - 1000;
 });
+
+userSchema.index({ role: 1, isActive: 1, name: 1 });
 
 // Hash password before saving
 userSchema.pre("save", async function () {
@@ -178,8 +209,8 @@ userSchema.methods.comparePassword = async function (password, userPassword) {
 
 // Check if password was changed after token was issued
 userSchema.methods.changePassword = function (jwtTimeStart) {
-  if (this.passwordChangeAt) {
-    timeInS = this.passwordChangeAt.getTime() / 1000;
+  if (this.passwordChangetAt) {
+    const timeInS = this.passwordChangetAt.getTime() / 1000;
     return timeInS > jwtTimeStart;
   }
   return false;
@@ -199,17 +230,14 @@ userSchema.methods.createPasswordResetToken = function () {
 // Create OTP for verification
 userSchema.methods.createOTP = function (purpose) {
   // Generate a 6-digit random OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  
+  const otp = crypto.randomInt(100000, 1000000).toString();
+
   // Hash the OTP before saving it to the database
-  this.verificationCode = crypto
-    .createHash("sha256")
-    .update(otp)
-    .digest("hex");
-    
+  this.verificationCode = crypto.createHash("sha256").update(otp).digest("hex");
+
   this.otpExpire = Date.now() + 60 * 1000 * 10; // 10 minutes
   this.otpPurpose = purpose;
-  
+
   return otp;
 };
 
